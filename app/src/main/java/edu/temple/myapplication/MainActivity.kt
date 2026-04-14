@@ -8,6 +8,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Button
 import android.widget.TextView
 
@@ -74,5 +76,40 @@ class MainActivity : AppCompatActivity() {
             findViewById<Button>(R.id.startButton).text = "Start"
             running = false
         }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.actionStop -> {
+                if(!timerBinder.isRunning) {
+                    timerBinder.pause()
+                }
+                timerBinder.stop()
+                findViewById<Button>(R.id.startButton).text = "Start"
+                running = false
+            }
+            R.id.actionStart -> {
+                if(isConnected) {
+                    if(!running) {
+                        timerBinder.start(100)
+                        findViewById<Button>(R.id.startButton).text = "Pause"
+                        running = true
+                    } else if(!timerBinder.isRunning) {
+                        timerBinder.pause()
+                        findViewById<Button>(R.id.startButton).text = "Pause"
+                    } else {
+                        timerBinder.pause()
+                        findViewById<Button>(R.id.startButton).text = "Unpause"
+                    }
+
+                }
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main, menu)
+        return super.onCreateOptionsMenu(menu)
     }
 }
