@@ -1,11 +1,14 @@
 package edu.temple.myapplication
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.edit
+import kotlin.math.PI
 
 @Suppress("ControlFlowWithEmptyBody")
 class TimerService : Service() {
@@ -18,26 +21,33 @@ class TimerService : Service() {
 
     private var paused = false
 
+    private val preferences by lazy {
+        getSharedPreferences("timer_pref", Context.MODE_PRIVATE)
+    }
+
+    private var currentValue = 0
     inner class TimerBinder : Binder() {
 
         // Check if Timer is already running
-        val isRunning: Boolean
-            get() = this@TimerService.isRunning
-
-        // Check if Timer is paused
-        val paused: Boolean
-            get() = this@TimerService.paused
+//        val isRunning: Boolean
+//            get() = this@TimerService.isRunning
+//
+//        // Check if Timer is paused
+//        val paused: Boolean
+//            get() = this@TimerService.paused
 
         // Start a new timer
         fun start(startValue: Int){
 
-            if (!paused) {
-                if (!isRunning) {
-                    if (::t.isInitialized) t.interrupt()
-                    this@TimerService.start(startValue)
+            if(!isRunning) {
+                if(::t.isInitialized) {
+                    t.interrupt()
                 }
-            } else {
-                pause()
+                isRunning = true
+                paused = false
+                currentValue = startValue
+                t = TimerThread(startValue)
+                t.start()
             }
         }
 
@@ -55,7 +65,11 @@ class TimerService : Service() {
 
         // Pause a running timer
         fun pause() {
-            this@TimerService.pause()
+//            this@TimerService.pause()
+            paused = true
+            preferences.edit{ putInt("paused_value", currentValue)}
+            t.interrupt()
+            isRunning=false
         }
 
     }
@@ -69,27 +83,29 @@ class TimerService : Service() {
     override fun onBind(intent: Intent): IBinder {
         return TimerBinder()
     }
-
-    fun start(startValue: Int) {
-        t = TimerThread(startValue)
-        t.start()
-    }
-
-    fun pause () {
-        if (::t.isInitialized) {
-            paused = !paused
-            isRunning = !paused
-        }
-    }
+//
+//    fun start(startValue: Int) {
+//        t = TimerThread(startValue)
+//        t.start()
+//
+//
+//    }
+//
+//    fun pause () {
+//        if (::t.isInitialized) {
+//            paused = !paused
+//            isRunning = !paused
+//        }
+//    }
 
     inner class TimerThread(private val startValue: Int) : Thread() {
 
         override fun run() {
             isRunning = true
             try {
-                for (i in startValue downTo 1)  {
+                for (i in startValue downTo 0)  {
                     Log.d("Countdown", i.toString())
-
+                    currentValue = 1
                     timerHandler?.sendEmptyMessage(i)
 
                     while (paused);
@@ -97,6 +113,8 @@ class TimerService : Service() {
 
                 }
                 isRunning = false
+                paused = false
+                preferences.edit{ remove("paused_value")}
             } catch (e: InterruptedException) {
                 Log.d("Timer interrupted", e.toString())
                 isRunning = false
@@ -107,11 +125,19 @@ class TimerService : Service() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        if (::t.isInitialized) {
-            t.interrupt()
+//        if (::t.isInitialized) {
+//            t.interrupt()
+//        }
+//
+//        return super.onUnbind(intent)
+        if(!paused) {
+            preferences.edit{remove("paused_value")}
         }
-
-        return super.onUnbind(intent)
+        if(::t.isInitialized && isRunning) {
+            t.interrupt()
+            isRunning =false
+        }
+        return true
     }
 
     override fun onDestroy() {

@@ -1,6 +1,7 @@
 package edu.temple.myapplication
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import androidx.appcompat.app.AppCompatActivity
@@ -19,6 +20,22 @@ class MainActivity : AppCompatActivity() {
     var isConnected = false
     var running = false
 
+    val serviceConnection = object : ServiceConnection {
+        val timerHandler = Handler(Looper.getMainLooper()) {
+            findViewById<TextView>(R.id.textView).text = it.what.toString()
+            true
+        }
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            timerBinder = service as TimerService.TimerBinder
+            timerBinder.setHandler(timerHandler)
+            isConnected = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            isConnected = false
+        }
+
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -26,24 +43,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.textView).text = "100"
 
 
-        val timerHandler = Handler(Looper.getMainLooper()) {
-            findViewById<TextView>(R.id.textView).text = it.what.toString()
-            true
-        }
 
 
-        val serviceConnection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                timerBinder = service as TimerService.TimerBinder
-                timerBinder.setHandler(timerHandler)
-                isConnected = true
-            }
 
-            override fun onServiceDisconnected(name: ComponentName?) {
-                isConnected = false
-            }
 
-        }
         bindService(
             Intent(this, TimerService::class.java),
             serviceConnection,
@@ -57,11 +60,13 @@ class MainActivity : AppCompatActivity() {
                     timerBinder.start(100)
                     findViewById<Button>(R.id.startButton).text = "Pause"
                     running = true
-                } else if(!timerBinder.isRunning) {
+                } else if(!running) {
                     timerBinder.pause()
+                    running = true
                     findViewById<Button>(R.id.startButton).text = "Pause"
                 } else {
                     timerBinder.pause()
+                    running = false
                     findViewById<Button>(R.id.startButton).text = "Unpause"
                 }
 
@@ -69,8 +74,11 @@ class MainActivity : AppCompatActivity() {
         }
         
         findViewById<Button>(R.id.stopButton).setOnClickListener {
-            if(!timerBinder.isRunning) {
-                timerBinder.pause()
+            if(isConnected) {
+                if (running) {
+                    timerBinder.pause()
+                    running = false
+                }
             }
             timerBinder.stop()
             findViewById<Button>(R.id.startButton).text = "Start"
@@ -81,8 +89,9 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.actionStop -> {
-                if(!timerBinder.isRunning) {
+                if(!running) {
                     timerBinder.pause()
+                    running = false
                 }
                 timerBinder.stop()
                 findViewById<Button>(R.id.startButton).text = "Start"
@@ -94,11 +103,13 @@ class MainActivity : AppCompatActivity() {
                         timerBinder.start(100)
                         findViewById<Button>(R.id.startButton).text = "Pause"
                         running = true
-                    } else if(!timerBinder.isRunning) {
+                    } else if(running) {
                         timerBinder.pause()
+                        running = true
                         findViewById<Button>(R.id.startButton).text = "Pause"
                     } else {
                         timerBinder.pause()
+                        running = true
                         findViewById<Button>(R.id.startButton).text = "Unpause"
                     }
 
@@ -111,5 +122,22 @@ class MainActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.main, menu)
         return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        bindService(
+            Intent(this, TimerService::class.java),
+            serviceConnection,
+            Context.BIND_AUTO_CREATE
+        )
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if(isConnected) {
+            unbindService(serviceConnection)
+        }
+        isConnected = false
     }
 }
